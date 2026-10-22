@@ -25,6 +25,30 @@ export const checkId = (req, res, next, id) => {
   next();
 };
 
+export const checkBody = (req, res, next) => {
+  if (!req.body) return next(new AppError('Request body is empty', 400));
+  if (!req.body.name) return next(new AppError('Tour name is required', 400));
+  next();
+};
+
+export const checkUpdateBody = (req, res, next) => {
+  if (!req.body || Object.keys(req.body).length === 0)
+    return next(new AppError('Request body is empty', 400));
+  if ('_id' in req.body)
+    return next(new AppError('Tour _id cannot be changed', 400));
+  if (
+    'name' in req.body &&
+    (typeof req.body.name !== 'string' || !req.body.name.trim())
+  )
+    return next(new AppError('Tour name must be a non-empty string', 400));
+  if (
+    'price' in req.body &&
+    (typeof req.body.price !== 'number' || req.body.price < 0)
+  )
+    return next(new AppError('Tour price must be a non-negative number', 400));
+  next();
+};
+
 export const getAllTours = (req, res) => {
   res.status(200).json({
     status: 'success',
