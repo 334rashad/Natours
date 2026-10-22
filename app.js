@@ -1,17 +1,27 @@
+// ===== Imports =====
 import { existsSync, readFileSync } from 'node:fs';
 import { writeFile } from 'node:fs/promises';
 import express from 'express';
+import morgan from 'morgan';
 
+// ===== Configuration =====
 const rootDir = import.meta.dirname;
 const toursFile = `${rootDir}/dev-data/data/tours.json`;
 const port = 3000;
 
+// Load .env before any code reads process.env
 if (existsSync(`${rootDir}/.env`)) {
   process.loadEnvFile(`${rootDir}/.env`);
 }
 
+// ===== Data =====
+// Tours live in memory and are written back to the JSON file after each change
 const tours = JSON.parse(readFileSync(toursFile, 'utf-8'));
 
+const saveTours = () => writeFile(toursFile, JSON.stringify(tours, null, 2));
+
+// ===== Helpers =====
+// Error with an HTTP status code; the error middleware at the bottom sends it
 class AppError extends Error {
   constructor(message, statusCode) {
     super(message);
@@ -19,8 +29,7 @@ class AppError extends Error {
   }
 }
 
-const saveTours = () => writeFile(toursFile, JSON.stringify(tours, null, 2));
-
+// Throws a 404 AppError when no tour matches the id
 const findTourIndex = (id) => {
   const index = tours.findIndex((t) => t._id === id);
   if (index === -1) throw new AppError('Tour not found', 404);
@@ -29,19 +38,14 @@ const findTourIndex = (id) => {
 
 const findTour = (id) => tours[findTourIndex(id)];
 
+// ===== App & Middleware =====
 const app = express();
 
+app.use(morgan('dev'));
 app.use(express.static(`${rootDir}/public`));
 app.use(express.json());
 
-// The Mapbox key is meant for the browser, so sending it to the client is intentional.
-app.get('/config.js', (req, res) => {
-  const key = process.env.MAPBOX_API_KEY ?? '';
-  res
-    .type('application/javascript')
-    .send(`window.MAPBOX_API_KEY = ${JSON.stringify(key)};`);
-});
-
+// ===== Tour Handlers =====
 const getAllTours = (req, res) => {
   res.status(200).json({
     status: 'success',
@@ -75,9 +79,24 @@ const createTour = async (req, res) => {
   res.status(201).json({ status: 'success', data: { tour: newTour } });
 };
 
-app.route('/api/v1/tours').get(getAllTours).post(createTour);
-app.route('/api/v1/tours/:id').get(getTour).patch(updateTour).delete(deleteTour);
+// ===== Routes =====
+// The Mapbox key is meant for the browser, so sending it to the client is intentional.
+app.get('/config.js', (req, res) => {
+  const key = process.env.MAPBOX_API_KEY ?? '';
+  res
+    .type('application/javascript')
+    .send(`window.MAPBOX_API_KEY = ${JSON.stringify(key)};`);
+});
 
+app.route('/api/v1/tours').get(getAllTours).post(createTour);
+app
+  .route('/api/v1/tours/:id')
+  .get(getTour)
+  .patch(updateTour)
+  .delete(deleteTour);
+
+// ===== Error Handling =====
+// Reached only when no route above responded
 app.use((req, res) => {
   res.status(404).json({
     status: 'fail',
@@ -85,6 +104,7 @@ app.use((req, res) => {
   });
 });
 
+// Four parameters tell Express this is error middleware, so `next` must stay
 app.use((err, req, res, next) => {
   const statusCode = err.statusCode ?? 500;
   res.status(statusCode).json({
@@ -93,6 +113,7 @@ app.use((err, req, res, next) => {
   });
 });
 
+// ===== Server =====
 app.listen(port, () => {
   console.log(`App running on port ${port}!!!`);
 });
