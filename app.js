@@ -79,6 +79,14 @@ const createTour = async (req, res) => {
   res.status(201).json({ status: 'success', data: { tour: newTour } });
 };
 
+// ===== User Handlers (placeholders) =====
+const userNotImplemented = (req, res) => {
+  res.status(501).json({
+    status: 'fail',
+    message: 'This route is not implemented yet',
+  });
+};
+
 // ===== Routes =====
 // The Mapbox key is meant for the browser, so sending it to the client is intentional.
 app.get('/config.js', (req, res) => {
@@ -94,6 +102,13 @@ app
   .get(getTour)
   .patch(updateTour)
   .delete(deleteTour);
+
+app.route('/api/v1/users').get(userNotImplemented).post(userNotImplemented);
+app
+  .route('/api/v1/users/:id')
+  .get(userNotImplemented)
+  .patch(userNotImplemented)
+  .delete(userNotImplemented);
 
 // ===== Error Handling =====
 // Reached only when no route above responded
