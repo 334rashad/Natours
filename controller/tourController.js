@@ -17,6 +17,14 @@ const findTourIndex = (id) => {
 
 const findTour = (id) => tours[findTourIndex(id)];
 
+// Router param middleware: stops the request with a 404 before the handler runs
+export const checkId = (req, res, next, id) => {
+  console.log(`Tour ID: ${id}`);
+  if (!tours.some((t) => t._id === id))
+    return next(new AppError('Tour not found', 404));
+  next();
+};
+
 export const getAllTours = (req, res) => {
   res.status(200).json({
     status: 'success',
