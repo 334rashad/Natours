@@ -9,7 +9,11 @@ const rootDir = import.meta.dirname;
 // ===== App & Middleware =====
 const app = express();
 
-app.use(morgan('dev'));
+if (process.env.NODE_ENV === 'development') {
+  app.use(morgan('dev'));
+}
+
+// app.use(morgan('dev')); // Already conditionally applied above
 app.use(express.static(`${rootDir}/public`));
 app.use(express.json());
 
