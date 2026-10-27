@@ -1,29 +1,7 @@
-import { readFileSync } from 'node:fs';
-import { writeFile } from 'node:fs/promises';
 import AppError from '../utils/appError.js';
+import { Tour } from '../models/tourModel.js';
 
-const rootDir = import.meta.dirname;
-const toursFile = `${rootDir}/../dev-data/data/tours.json`;
-const tours = JSON.parse(readFileSync(toursFile, 'utf-8'));
-
-const saveTours = () => writeFile(toursFile, JSON.stringify(tours, null, 2));
-
-// Throws a 404 AppError when no tour matches the id
-const findTourIndex = (id) => {
-  const index = tours.findIndex((t) => t._id === id);
-  if (index === -1) throw new AppError('Tour not found', 404);
-  return index;
-};
-
-const findTour = (id) => tours[findTourIndex(id)];
-
-// Router param middleware: stops the request with a 404 before the handler runs
-export const checkId = (req, res, next, id) => {
-  console.log(`Tour ID: ${id}`);
-  if (!tours.some((t) => t._id === id))
-    return next(new AppError('Tour not found', 404));
-  next();
-};
+const tourNotFound = () => new AppError('Tour not found', 404);
 
 export const checkBody = (req, res, next) => {
   if (!req.body) return next(new AppError('Request body is empty', 400));
@@ -49,7 +27,8 @@ export const checkUpdateBody = (req, res, next) => {
   next();
 };
 
-export const getAllTours = (req, res) => {
+export const getAllTours = async (req, res) => {
+  const tours = await Tour.find();
   res.status(200).json({
     status: 'success',
     results: tours.length,
@@ -57,27 +36,28 @@ export const getAllTours = (req, res) => {
   });
 };
 
-export const getTour = (req, res) => {
-  const tour = findTour(req.params.id);
+export const getTour = async (req, res) => {
+  const tour = await Tour.findById(req.params.id);
+  if (!tour) throw tourNotFound();
   res.status(200).json({ status: 'success', data: { tour } });
 };
 
 export const updateTour = async (req, res) => {
-  const tour = findTour(req.params.id);
-  Object.assign(tour, req.body);
-  await saveTours();
+  const tour = await Tour.findByIdAndUpdate(req.params.id, req.body, {
+    new: true,
+    runValidators: true,
+  });
+  if (!tour) throw tourNotFound();
   res.status(200).json({ status: 'success', data: { tour } });
 };
 
 export const deleteTour = async (req, res) => {
-  tours.splice(findTourIndex(req.params.id), 1);
-  await saveTours();
+  const tour = await Tour.findByIdAndDelete(req.params.id);
+  if (!tour) throw tourNotFound();
   res.status(204).end();
 };
 
 export const createTour = async (req, res) => {
-  const newTour = req.body;
-  tours.push(newTour);
-  await saveTours();
-  res.status(201).json({ status: 'success', data: { tour: newTour } });
+  const tour = await Tour.create(req.body);
+  res.status(201).json({ status: 'success', data: { tour } });
 };
