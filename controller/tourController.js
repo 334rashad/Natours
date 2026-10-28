@@ -3,12 +3,6 @@ import { Tour } from '../models/tourModel.js';
 
 const tourNotFound = () => new AppError('Tour not found', 404);
 
-export const checkBody = (req, res, next) => {
-  if (!req.body) return next(new AppError('Request body is empty', 400));
-  if (!req.body.name) return next(new AppError('Tour name is required', 400));
-  next();
-};
-
 export const checkUpdateBody = (req, res, next) => {
   if (!req.body || Object.keys(req.body).length === 0)
     return next(new AppError('Request body is empty', 400));
@@ -58,6 +52,10 @@ export const deleteTour = async (req, res) => {
 };
 
 export const createTour = async (req, res) => {
-  const tour = await Tour.create(req.body);
-  res.status(201).json({ status: 'success', data: { tour } });
+  try {
+    const tour = await Tour.create(req.body);
+    res.status(201).json({ status: 'success', data: { tour } });
+  } catch (err) {
+    throw new AppError(err.message, 400);
+  }
 };
