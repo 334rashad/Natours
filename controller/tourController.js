@@ -3,6 +3,12 @@ import { Tour } from '../models/tourModel.js';
 
 const tourNotFound = () => new AppError('Tour not found', 404);
 
+// Malformed IDs and failed validation are client errors; anything else stays a server error
+const toAppError = (err) =>
+  err.name === 'CastError' || err.name === 'ValidationError'
+    ? new AppError(err.message, 400)
+    : err;
+
 export const checkUpdateBody = (req, res, next) => {
   if (!req.body || Object.keys(req.body).length === 0)
     return next(new AppError('Request body is empty', 400));
@@ -21,41 +27,57 @@ export const checkUpdateBody = (req, res, next) => {
   next();
 };
 
-export const getAllTours = async (req, res) => {
-  const tours = await Tour.find();
-  res.status(200).json({
-    status: 'success',
-    results: tours.length,
-    data: { tours },
-  });
+export const getAllTours = async (req, res, next) => {
+  try {
+    const tours = await Tour.find();
+    res.status(200).json({
+      status: 'success',
+      results: tours.length,
+      data: { tours },
+    });
+  } catch (err) {
+    next(toAppError(err));
+  }
 };
 
-export const getTour = async (req, res) => {
-  const tour = await Tour.findById(req.params.id);
-  if (!tour) throw tourNotFound();
-  res.status(200).json({ status: 'success', data: { tour } });
+export const getTour = async (req, res, next) => {
+  try {
+    const tour = await Tour.findById(req.params.id);
+    if (!tour) return next(tourNotFound());
+    res.status(200).json({ status: 'success', data: { tour } });
+  } catch (err) {
+    next(toAppError(err));
+  }
 };
 
-export const updateTour = async (req, res) => {
-  const tour = await Tour.findByIdAndUpdate(req.params.id, req.body, {
-    new: true,
-    runValidators: true,
-  });
-  if (!tour) throw tourNotFound();
-  res.status(200).json({ status: 'success', data: { tour } });
+export const updateTour = async (req, res, next) => {
+  try {
+    const tour = await Tour.findByIdAndUpdate(req.params.id, req.body, {
+      new: true,
+      runValidators: true,
+    });
+    if (!tour) return next(tourNotFound());
+    res.status(200).json({ status: 'success', data: { tour } });
+  } catch (err) {
+    next(toAppError(err));
+  }
 };
 
-export const deleteTour = async (req, res) => {
-  const tour = await Tour.findByIdAndDelete(req.params.id);
-  if (!tour) throw tourNotFound();
-  res.status(204).end();
+export const deleteTour = async (req, res, next) => {
+  try {
+    const tour = await Tour.findByIdAndDelete(req.params.id);
+    if (!tour) return next(tourNotFound());
+    res.status(204).end();
+  } catch (err) {
+    next(toAppError(err));
+  }
 };
 
-export const createTour = async (req, res) => {
+export const createTour = async (req, res, next) => {
   try {
     const tour = await Tour.create(req.body);
     res.status(201).json({ status: 'success', data: { tour } });
   } catch (err) {
-    throw new AppError(err.message, 400);
+    next(toAppError(err));
   }
 };
