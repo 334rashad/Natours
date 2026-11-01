@@ -27,9 +27,31 @@ export const checkUpdateBody = (req, res, next) => {
   next();
 };
 
+// Builds an equality filter from query params that match tour schema fields.
+// Unknown params are ignored; object values (e.g. ?price[$ne]=1) are rejected to block operator injection.
+const toFilterCondition = (key, value) => {
+  if (typeof value === 'string') return value;
+  if (Array.isArray(value) && value.every((v) => typeof v === 'string'))
+    return { $in: value };
+  throw new AppError(`Invalid value for query parameter '${key}'`, 400);
+};
+
+const buildTourFilter = (query) =>
+  Object.entries(query)
+    .filter(([key]) => Tour.schema.path(key))
+    .reduce((filter, [key, value]) => {
+      filter[key] = toFilterCondition(key, value);
+      return filter;
+    }, {});
+
 export const getAllTours = async (req, res, next) => {
   try {
-    const tours = await Tour.find();
+    const tours = await Tour.find(buildTourFilter(req.query));
+
+    // const queryObj = { ...req.query };
+    // const excludedFields = ['page', 'sort', 'limit', 'fields'];
+    // excludedFields.forEach((el) => delete queryObj[el]);
+    // const tours = await Tour.find({});
     res.status(200).json({
       status: 'success',
       results: tours.length,
