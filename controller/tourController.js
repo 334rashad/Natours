@@ -39,19 +39,21 @@ const toFilterCondition = (key, value) => {
 const buildTourFilter = (query) =>
   Object.entries(query)
     .filter(([key]) => Tour.schema.path(key))
-    .reduce((filter, [key, value]) => {
-      filter[key] = toFilterCondition(key, value);
-      return filter;
-    }, {});
+    .reduce(
+      (filter, [key, value]) => ({
+        ...filter,
+        [key]: toFilterCondition(key, value),
+      }),
+      {},
+    );
 
 export const getAllTours = async (req, res, next) => {
   try {
-    const tours = await Tour.find(buildTourFilter(req.query));
+    const queryObj = { ...req.query };
+    const query = await Tour.find(buildTourFilter(queryObj));
 
-    // const queryObj = { ...req.query };
-    // const excludedFields = ['page', 'sort', 'limit', 'fields'];
-    // excludedFields.forEach((el) => delete queryObj[el]);
-    // const tours = await Tour.find({});
+    const tours = await query;
+
     res.status(200).json({
       status: 'success',
       results: tours.length,
