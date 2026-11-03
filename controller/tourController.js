@@ -27,9 +27,51 @@ export const checkUpdateBody = (req, res, next) => {
   next();
 };
 
+const comparisonOperators = ['gt', 'gte', 'lt', 'lte'];
+
+// Builds a filter from schema fields and explicitly supported query operators.
+const toFilterCondition = (key, value) => {
+  if (typeof value === 'string') return value;
+  if (Array.isArray(value) && value.every((v) => typeof v === 'string'))
+    return { $in: value };
+  if (value && typeof value === 'object') {
+    const conditions = Object.entries(value);
+    if (
+      conditions.length > 0 &&
+      conditions.every(
+        ([operator, operand]) =>
+          comparisonOperators.includes(operator) && typeof operand === 'string',
+      )
+    )
+      return conditions.reduce(
+        (filter, [operator, operand]) => ({
+          ...filter,
+          [`$${operator}`]: operand,
+        }),
+        {},
+      );
+  }
+  throw new AppError(`Invalid value for query parameter '${key}'`, 400);
+};
+
+const buildTourFilter = (query) =>
+  Object.entries(query)
+    .filter(([key]) => Tour.schema.path(key))
+    .reduce(
+      (filter, [key, value]) => ({
+        ...filter,
+        [key]: toFilterCondition(key, value),
+      }),
+      {},
+    );
+
 export const getAllTours = async (req, res, next) => {
   try {
-    const tours = await Tour.find();
+    const queryObj = { ...req.query };
+    const query = Tour.find(buildTourFilter(queryObj));
+
+    const tours = await query;
+
     res.status(200).json({
       status: 'success',
       results: tours.length,
