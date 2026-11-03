@@ -65,10 +65,38 @@ const buildTourFilter = (query) =>
       {},
     );
 
+const DEFAULT_SORT = { createdAt: -1 };
+
+// Accepts `sort=price,-ratingsAverage`: fields apply in order, a leading '-' sorts descending.
+const buildTourSort = (sortParam) => {
+  if (sortParam === undefined) return DEFAULT_SORT;
+  if (typeof sortParam !== 'string')
+    throw new AppError(
+      "Query parameter 'sort' must be a comma-separated list",
+      400,
+    );
+
+  const entries = sortParam
+    .split(',')
+    .map((item) => item.trim())
+    .filter(Boolean);
+  if (entries.length === 0) return DEFAULT_SORT;
+
+  return entries.reduce((sort, entry) => {
+    const descending = entry.startsWith('-');
+    const field = descending ? entry.slice(1) : entry;
+    if (!Object.hasOwn(Tour.schema.paths, field))
+      throw new AppError(`Cannot sort tours by unknown field '${field}'`, 400);
+    return { ...sort, [field]: descending ? -1 : 1 };
+  }, {});
+};
+
 export const getAllTours = async (req, res, next) => {
   try {
-    const queryObj = { ...req.query };
-    const query = Tour.find(buildTourFilter(queryObj));
+    const { sort, ...queryObj } = req.query;
+    const query = Tour.find(buildTourFilter(queryObj)).sort(
+      buildTourSort(sort),
+    );
 
     const tours = await query;
 
