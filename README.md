@@ -79,6 +79,23 @@ GET /tours?difficulty=easy&sort=-ratingsAverage,price
 
 When `sort` is omitted or empty, tours are returned newest first (`-createdAt`). A field that is not in the Tour schema, or a `sort` value that is not a string (for example, repeating the parameter), returns `400 Bad Request`.
 
+### Limit fields
+
+Use the `fields` parameter with a comma-separated list of tour fields to return only those fields. Prefix every field with `-` to return all fields except the listed ones:
+
+```http
+GET /tours?fields=name,price
+GET /tours?fields=-description,-images
+```
+
+Field limiting works on both `GET /tours` and `GET /tours/:id`, and combines with filters and sorting:
+
+```http
+GET /tours?difficulty=easy&sort=price&fields=name,price,difficulty
+```
+
+Included and excluded fields cannot be mixed in one request. A field that is not in the Tour schema, a mix of included and excluded fields, or a `fields` value that is not a string returns `400 Bad Request`. When `fields` is omitted or empty, every field is returned.
+
 ### Get one tour
 
 ```http

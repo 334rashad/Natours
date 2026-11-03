@@ -91,12 +91,44 @@ const buildTourSort = (sortParam) => {
   }, {});
 };
 
+// Accepts `fields=name,price` to include fields or `fields=-description` to exclude them.
+// Mixing both forms is rejected because MongoDB projections can't combine them.
+const buildTourProjection = (fieldsParam) => {
+  if (fieldsParam === undefined) return undefined;
+  if (typeof fieldsParam !== 'string')
+    throw new AppError(
+      "Query parameter 'fields' must be a comma-separated list",
+      400,
+    );
+
+  const entries = fieldsParam
+    .split(',')
+    .map((item) => item.trim())
+    .filter(Boolean);
+  if (entries.length === 0) return undefined;
+
+  const excluding = entries[0].startsWith('-');
+  if (entries.some((entry) => entry.startsWith('-') !== excluding))
+    throw new AppError(
+      "Query parameter 'fields' cannot mix included and excluded fields",
+      400,
+    );
+
+  return entries.reduce((projection, entry) => {
+    const field = excluding ? entry.slice(1) : entry;
+    if (!Object.hasOwn(Tour.schema.paths, field))
+      throw new AppError(`Cannot select unknown tour field '${field}'`, 400);
+    return { ...projection, [field]: excluding ? 0 : 1 };
+  }, {});
+};
+
 export const getAllTours = async (req, res, next) => {
   try {
-    const { sort, ...queryObj } = req.query;
-    const query = Tour.find(buildTourFilter(queryObj)).sort(
-      buildTourSort(sort),
-    );
+    const { sort, fields, ...queryObj } = req.query;
+    const query = Tour.find(
+      buildTourFilter(queryObj),
+      buildTourProjection(fields),
+    ).sort(buildTourSort(sort));
 
     const tours = await query;
 
@@ -112,7 +144,10 @@ export const getAllTours = async (req, res, next) => {
 
 export const getTour = async (req, res, next) => {
   try {
-    const tour = await Tour.findById(req.params.id);
+    const tour = await Tour.findById(
+      req.params.id,
+      buildTourProjection(req.query.fields),
+    );
     if (!tour) return next(tourNotFound());
     res.status(200).json({ status: 'success', data: { tour } });
   } catch (err) {
