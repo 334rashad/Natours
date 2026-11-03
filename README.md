@@ -61,6 +61,24 @@ GET /tours?difficulty=easy&price[lt]=500
 
 The query parser turns bracket notation into nested query values. Only fields defined in the Tour schema are used; unknown fields are ignored. For a known field, unsupported nested operators return `400 Bad Request`. Values arrive from the URL as strings and Mongoose casts them to the schema field's type.
 
+### Sort tours
+
+Use the `sort` parameter with a comma-separated list of tour fields. Fields are applied in the order given. Ascending is the default; prefix a field with `-` for descending:
+
+```http
+GET /tours?sort=price
+GET /tours?sort=-price
+GET /tours?sort=price,-ratingsAverage
+```
+
+Sorting combines with filters:
+
+```http
+GET /tours?difficulty=easy&sort=-ratingsAverage,price
+```
+
+When `sort` is omitted or empty, tours are returned newest first (`-createdAt`). A field that is not in the Tour schema, or a `sort` value that is not a string (for example, repeating the parameter), returns `400 Bad Request`.
+
 ### Get one tour
 
 ```http
