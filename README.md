@@ -20,12 +20,18 @@ The port can be changed with the `PORT` environment variable.
 GET /tours
 ```
 
-Returns all tours. The response has this shape:
+Returns one page of tours. The response has this shape:
 
 ```json
 {
   "status": "success",
   "results": 1,
+  "pagination": {
+    "page": 1,
+    "limit": 10,
+    "total": 9,
+    "totalPages": 1
+  },
   "data": {
     "tours": [
       {
@@ -38,6 +44,16 @@ Returns all tours. The response has this shape:
   }
 }
 ```
+
+### Paginate tours
+
+Use the `page` and `limit` parameters to request one page at a time:
+
+```http
+GET /tours?page=2&limit=5
+```
+
+`page` defaults to `1` and `limit` defaults to `10`. `limit` can be at most `100`. `results` is the number of tours on the current page, and `pagination.total` is the number of tours matching the filters. Pagination combines with filters, sorting, and field limiting. Requesting a page past the last one returns `404 Not Found`. Page 1 always exists, so it returns an empty `tours` array when nothing matches. A `page` or `limit` value that is not a positive integer, or a `limit` above `100`, returns `400 Bad Request`.
 
 ### Filter tours
 
@@ -77,7 +93,7 @@ Sorting combines with filters:
 GET /tours?difficulty=easy&sort=-ratingsAverage,price
 ```
 
-When `sort` is omitted or empty, tours are returned newest first (`-createdAt`). A field that is not in the Tour schema, or a `sort` value that is not a string (for example, repeating the parameter), returns `400 Bad Request`.
+When `sort` is omitted or empty, tours are returned newest first (`-createdAt`). Tours with equal sort values are ordered by `_id` so that pages stay consistent, unless `_id` is part of `sort`. A field that is not in the Tour schema, or a `sort` value that is not a string (for example, repeating the parameter), returns `400 Bad Request`.
 
 ### Limit fields
 
