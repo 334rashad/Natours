@@ -122,19 +122,66 @@ const buildTourProjection = (fieldsParam) => {
   }, {});
 };
 
+const DEFAULT_PAGE = 1;
+const DEFAULT_LIMIT = 10;
+const MAX_LIMIT = 100;
+
+const parsePositiveInteger = (key, value, fallback) => {
+  if (value === undefined) return fallback;
+  const number = Number(value);
+  if (
+    typeof value !== 'string' ||
+    !/^\d+$/.test(value) ||
+    !Number.isSafeInteger(number) ||
+    number < 1
+  )
+    throw new AppError(
+      `Query parameter '${key}' must be a positive integer`,
+      400,
+    );
+  return number;
+};
+
 export const getAllTours = async (req, res, next) => {
   try {
-    const { sort, fields, ...queryObj } = req.query;
-    const query = Tour.find(
-      buildTourFilter(queryObj),
-      buildTourProjection(fields),
-    ).sort(buildTourSort(sort));
+    const { sort, fields, page, limit, ...queryObj } = req.query;
+    const filter = buildTourFilter(queryObj);
+    const currentPage = parsePositiveInteger('page', page, DEFAULT_PAGE);
+    const pageSize = parsePositiveInteger('limit', limit, DEFAULT_LIMIT);
+    if (pageSize > MAX_LIMIT)
+      throw new AppError(
+        `Query parameter 'limit' cannot exceed ${MAX_LIMIT}`,
+        400,
+      );
 
-    const tours = await query;
+    const sortSpec = buildTourSort(sort);
+
+    const total = await Tour.countDocuments(filter);
+    const totalPages = Math.ceil(total / pageSize);
+    // Page 1 always exists, even when no tours match.
+    if (currentPage > Math.max(totalPages, 1))
+      return next(
+        new AppError(
+          `Page ${currentPage} does not exist; the last page is ${Math.max(totalPages, 1)}`,
+          404,
+        ),
+      );
+
+    const tours = await Tour.find(filter, buildTourProjection(fields))
+      // _id is a unique tiebreaker so page boundaries stay stable when sort values repeat.
+      .sort({ ...sortSpec, _id: sortSpec._id ?? 1 })
+      .skip((currentPage - 1) * pageSize)
+      .limit(pageSize);
 
     res.status(200).json({
       status: 'success',
       results: tours.length,
+      pagination: {
+        page: currentPage,
+        limit: pageSize,
+        total,
+        totalPages,
+      },
       data: { tours },
     });
   } catch (err) {
