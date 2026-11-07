@@ -9,6 +9,13 @@ const toAppError = (err) =>
     ? new AppError(err.message, 400)
     : err;
 
+export const aliasTopTours = (req, res, next) => {
+  req.query.limit = '5';
+  req.query.sort = '-ratingsAverage,price';
+  req.query.fields = 'name,price,ratingsAverage,summary,difficulty';
+  next();
+};
+
 export const checkUpdateBody = (req, res, next) => {
   if (!req.body || Object.keys(req.body).length === 0)
     return next(new AppError('Request body is empty', 400));
