@@ -240,3 +240,33 @@ export const createTour = async (req, res, next) => {
     next(toAppError(err));
   }
 };
+
+export const getTourStats = async (req, res, next) => {
+  try {
+    const stats = await Tour.aggregate([
+      {
+        $match: { ratingsAverage: { $gte: 4.5 } }, // filter
+      },
+      {
+        $group: {
+          _id: { $toUpper: '$difficulty' },
+          numTours: { $sum: 1 },
+          numRatings: { $sum: '$ratingsQuantity' },
+          avgRating: { $avg: '$ratingsAverage' },
+          avgPrice: { $avg: '$price' },
+          minPrice: { $min: '$price' },
+          maxPrice: { $max: '$price' },
+        },
+      },
+      {
+        $sort: { avgPrice: 1 },
+      },
+      {
+        $match: { _id: { $ne: 'EASY' } },
+      },
+    ]);
+    res.status(200).json({ status: 'success', data: { stats } });
+  } catch (err) {
+    next(toAppError(err));
+  }
+};
