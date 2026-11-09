@@ -53,7 +53,7 @@ Use the `page` and `limit` parameters to request one page at a time:
 GET /tours?page=2&limit=5
 ```
 
-`page` defaults to `1` and `limit` defaults to `10`. `limit` can be at most `100`. `results` is the number of tours on the current page, and `pagination.total` is the number of tours matching the filters. Pagination combines with filters, sorting, and field limiting. Requesting a page past the last one returns `404 Not Found`. Page 1 always exists, so it returns an empty `tours` array when nothing matches. A `page` or `limit` value that is not a positive integer, or a `limit` above `100`, returns `400 Bad Request`.
+`page` defaults to `1` and `limit` defaults to `10`. `limit` can be at most `100`. `results` is the number of tours on the current page, and `pagination.total` is the number of tours matching the filters. Pagination combines with filters, sorting, and field limiting. A page past the last one returns an empty `tours` array. A `page` or `limit` value that is not a positive integer, or a `limit` above `100`, returns `400 Bad Request`.
 
 ### Filter tours
 

@@ -163,22 +163,14 @@ export const getAllTours = async (req, res, next) => {
 
     const sortSpec = buildTourSort(sort);
 
-    const total = await Tour.countDocuments(filter);
-    const totalPages = Math.ceil(total / pageSize);
-    // Page 1 always exists, even when no tours match.
-    if (currentPage > Math.max(totalPages, 1))
-      return next(
-        new AppError(
-          `Page ${currentPage} does not exist; the last page is ${Math.max(totalPages, 1)}`,
-          404,
-        ),
-      );
-
-    const tours = await Tour.find(filter, buildTourProjection(fields))
+    const [tours, total] = await Promise.all([
       // _id is a unique tiebreaker so page boundaries stay stable when sort values repeat.
-      .sort({ ...sortSpec, _id: sortSpec._id ?? 1 })
-      .skip((currentPage - 1) * pageSize)
-      .limit(pageSize);
+      Tour.find(filter, buildTourProjection(fields))
+        .sort({ ...sortSpec, _id: sortSpec._id ?? 1 })
+        .skip((currentPage - 1) * pageSize)
+        .limit(pageSize),
+      Tour.countDocuments(filter),
+    ]);
 
     res.status(200).json({
       status: 'success',
@@ -187,7 +179,7 @@ export const getAllTours = async (req, res, next) => {
         page: currentPage,
         limit: pageSize,
         total,
-        totalPages,
+        totalPages: Math.ceil(total / pageSize),
       },
       data: { tours },
     });
