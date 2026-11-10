@@ -262,3 +262,42 @@ export const getTourStats = async (req, res, next) => {
     next(toAppError(err));
   }
 };
+
+export const getMonthlyPlan = async (req, res, next) => {
+  try {
+    const year = +req.params.year;
+    const plan = await Tour.aggregate([
+      {
+        $unwind: '$startDates',
+      },
+      {
+        $match: {
+          startDates: {
+            $gte: new Date(`${year}-01-01`),
+            $lt: new Date(`${year + 1}-01-01`),
+          },
+        },
+      },
+      {
+        $group: {
+          _id: { $month: '$startDates' },
+          numTourStarts: { $sum: 1 },
+          tours: { $push: '$name' },
+        },
+      },
+      {
+        $addFields: { month: '$_id' },
+      },
+      {
+        $project: { _id: 0 },
+      },
+      {
+        $sort: { numTourStarts: -1 },
+      },
+      { $limit: 12 },
+    ]);
+    res.status(200).json({ status: 'success', data: { plan } });
+  } catch (err) {
+    next(toAppError(err));
+  }
+};
