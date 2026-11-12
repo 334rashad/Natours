@@ -1,4 +1,5 @@
 import mongoose from 'mongoose';
+import slugify from 'slugify';
 
 const tourSchema = new mongoose.Schema(
   {
@@ -7,6 +8,9 @@ const tourSchema = new mongoose.Schema(
       required: [true, 'Tour name is required'],
       unique: true,
       trim: true,
+    },
+    slug: {
+      type: String,
     },
     duration: {
       type: Number,
@@ -59,6 +63,11 @@ const tourSchema = new mongoose.Schema(
     startDates: {
       type: [Date],
     },
+    secretTour: {
+      type: Boolean,
+      default: false,
+      select: false,
+    },
   },
   {
     toJSON: { virtuals: true },
@@ -66,8 +75,57 @@ const tourSchema = new mongoose.Schema(
   },
 );
 
+// Virtual property for duration in weeks
 tourSchema.virtual('durationWeeks').get(function () {
   return this.duration / 7;
+});
+
+// Query middleware to exclude secret tours from find queries
+// tourSchema.pre('find', function (next) {
+tourSchema.pre(/^find/, function () {
+  this.startTime = Date.now();
+  this.find({ secretTour: { $ne: true } });
+});
+
+// Post query middleware to log query execution time
+tourSchema.post(/^find/, function () {
+  if (this.startTime === undefined) return;
+  console.log(`Query took ${Date.now() - this.startTime} milliseconds`);
+});
+
+// Count only visible tours so `total` matches the tours returned
+tourSchema.pre('countDocuments', function () {
+  this.startTime = Date.now();
+  this.find({ secretTour: { $ne: true } });
+});
+
+//Aggregate middleware to exclude secret tours from aggregation results
+tourSchema.pre('aggregate', function () {
+  this.pipeline().unshift({ $match: { secretTour: { $ne: true } } });
+});
+
+// Builds the URL-friendly slug used by the save, update, and bulk insert hooks
+const makeSlug = (name) => slugify(name, { lower: true, strict: true });
+
+// Document middleware: builds a URL-friendly slug whenever a tour is created or renamed
+tourSchema.pre('save', function () {
+  if (this.isModified('name')) {
+    this.slug = makeSlug(this.name);
+  }
+});
+
+// Query middleware: keeps the slug in sync when a tour is renamed through an update query
+tourSchema.pre(['findOneAndUpdate', 'updateOne'], function () {
+  const update = this.getUpdate();
+  const name = update?.name ?? update?.$set?.name;
+  if (typeof name === 'string') this.set({ slug: makeSlug(name) });
+});
+
+// Model middleware: insertMany skips save hooks, so bulk inserts set slugs here
+tourSchema.pre('insertMany', (docs) => {
+  docs.forEach((doc) => {
+    if (typeof doc.name === 'string') doc.slug = makeSlug(doc.name);
+  });
 });
 
 export const Tour = mongoose.model('Tour', tourSchema);
