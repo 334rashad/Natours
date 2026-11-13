@@ -47,6 +47,14 @@ const tourSchema = new mongoose.Schema(
     priceDiscount: {
       type: Number,
       default: 0,
+      validate: {
+        validator: function (value) {
+          // On update queries `this` is the Query, so the update hook below does this check instead
+          if (this instanceof mongoose.Query) return true;
+          return value < this.price;
+        },
+        message: 'Discount price ({VALUE}) should be below regular price',
+      },
     },
     summary: {
       type: String,
@@ -127,6 +135,36 @@ tourSchema.pre(['findOneAndUpdate', 'updateOne'], function () {
   const update = this.getUpdate();
   const name = update?.name ?? update?.$set?.name;
   if (typeof name === 'string') this.set({ slug: makeSlug(name) });
+});
+
+// Query middleware: checks the discount against the price on update queries
+tourSchema.pre(['findOneAndUpdate', 'updateOne'], async function () {
+  const update = this.getUpdate() ?? {};
+  const changes = { ...update, ...update.$set };
+  const hasPrice = changes.price !== undefined;
+  const hasDiscount = changes.priceDiscount !== undefined;
+  if (!hasPrice && !hasDiscount) return;
+
+  // Raw collection avoids the secret-tour filter so secret tours are checked too
+  const stored = await this.model.collection.findOne(this.getQuery(), {
+    projection: { price: 1, priceDiscount: 1 },
+  });
+  if (!stored) return;
+
+  const price = hasPrice ? changes.price : stored.price;
+  const discount = hasDiscount ? changes.priceDiscount : stored.priceDiscount;
+  if (discount < price) return;
+
+  const error = new mongoose.Error.ValidationError();
+  error.addError(
+    'priceDiscount',
+    new mongoose.Error.ValidatorError({
+      path: 'priceDiscount',
+      value: discount,
+      message: `Discount price (${discount}) should be below regular price`,
+    }),
+  );
+  throw error;
 });
 
 // Model middleware: insertMany skips save hooks, so bulk inserts set slugs here
